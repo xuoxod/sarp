@@ -1,0 +1,65 @@
+# .gitignore for the `sarp` scaffold repository
+# Purpose: ignore build artifacts, editor cruft, secrets, and local env files
+
+# Rust / Cargo
+/target/
+**/target/
+Cargo.lock
+# Keep Cargo.toml tracked
+
+# Editor directories and files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (local overrides / secrets)
+.env
+.env.*
+.env.local
+.envrc
+
+# Python virtualenvs (if someone runs tests with python tools)
+venv/
+.Python
+
+# Temporary and backup files
+*.log
+*.tmp
+*.swp
+*~
+
+# Compiled/linked artifacts
+*.rlib
+*.rmeta
+*.dSYM/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Coverage and test output
+coverage/
+htmlcov/
+.nyc_output/
+*.prof
+
+# Common secrets / keys (avoid accidental commits)
+*.pem
+*.key
+secrets.yml
+
+# CI artifacts / local build directories
+/.cache
+
+# Optional local IDE project files
+*.iml
+
+# If you add docs or example build outputs
+docs/_build/
+
+# end of file

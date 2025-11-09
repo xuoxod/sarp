@@ -14,13 +14,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies (shellcheck, markdownlint)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install markdownlint CLI
+        run: |
+          npm install -g markdownlint-cli@0.34.0
+
+      - name: Install ShellCheck
         run: |
           sudo apt-get update -y
           sudo apt-get install -y shellcheck
-          # markdownlint-cli requires npm; install minimal node
-          sudo apt-get install -y nodejs npm || true
-          sudo npm install -g markdownlint-cli || true
 
       - name: ShellCheck (lint shell scripts)
         run: |

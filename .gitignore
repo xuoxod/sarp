@@ -63,3 +63,4 @@ secrets.yml
 docs/_build/
 
 # end of file
+.venv/

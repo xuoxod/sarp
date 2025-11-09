@@ -1,0 +1,40 @@
+name: Generate social preview
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    name: Generate social preview PNG and commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Install renderer
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y librsvg2-bin git
+
+      - name: Render PNG from SVG
+        run: |
+          mkdir -p scripts/sarp/assets
+          rsvg-convert -w 1200 -h 630 -o scripts/sarp/assets/social_preview.png scripts/sarp/assets/social_preview.svg
+          ls -l scripts/sarp/assets || true
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "sarp-generator[bot]"
+          git config user.email "sarp-generator@users.noreply.github.com"
+          if git diff --quiet -- scripts/sarp/assets/social_preview.png; then
+            echo "No changes to social_preview.png"
+          else
+            git add scripts/sarp/assets/social_preview.png
+            git commit -m "chore(ci): generate social preview PNG"
+            git push
+          fi

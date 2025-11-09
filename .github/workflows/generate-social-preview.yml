@@ -23,18 +23,18 @@ jobs:
 
       - name: Render PNG from SVG
         run: |
-          mkdir -p scripts/sarp/assets
-          rsvg-convert -w 1200 -h 630 -o scripts/sarp/assets/social_preview.png scripts/sarp/assets/social_preview.svg
-          ls -l scripts/sarp/assets || true
+          mkdir -p assets
+          rsvg-convert -w 1200 -h 630 -o assets/social_preview.png assets/social_preview.svg
+          ls -l assets || true
 
       - name: Commit and push if changed
         run: |
           git config user.name "sarp-generator[bot]"
           git config user.email "sarp-generator@users.noreply.github.com"
-          if git diff --quiet -- scripts/sarp/assets/social_preview.png; then
+          if git diff --quiet -- assets/social_preview.png; then
             echo "No changes to social_preview.png"
           else
-            git add scripts/sarp/assets/social_preview.png
+            git add assets/social_preview.png
             git commit -m "chore(ci): generate social preview PNG"
             git push
           fi

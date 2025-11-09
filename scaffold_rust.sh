@@ -19,7 +19,7 @@ Options:
   -e EDITION     Rust edition (2018|2021). Default: 2021
   -a AUTHOR      Author string to place in Cargo.toml and LICENSE
   -l LICENSE     License: MIT (default), Apache-2.0 or None
-  --no-cargo-init  Don't run `cargo init`; create files manually
+  --no-cargo-init  Don't run 'cargo init'; create files manually
   --ci           Add a basic GitHub Actions CI workflow
   --git          Initialize a git repository and create initial commit
   -f, --force    Overwrite existing files when safe
@@ -110,6 +110,10 @@ fi
 if [[ $NO_COLOR -eq 1 ]]; then SCAFFOLD_NO_COLOR=1; fi
 if [[ $NO_HEADER -eq 1 ]]; then SCAFFOLD_NO_HEADER=1; fi
 if [[ $ASSUME_YES -eq 1 ]]; then SCAFFOLD_ASSUME_YES=1; fi
+# mark these variables as intentionally referenced to quiet shellcheck warnings
+: "${SCAFFOLD_NO_COLOR:-}"
+: "${SCAFFOLD_NO_HEADER:-}"
+: "${SCAFFOLD_ASSUME_YES:-}"
 
 if [[ -z "$NAME" ]]; then
   NAME=$(basename "$(pwd)")
@@ -186,6 +190,7 @@ if [[ ${DO_CHECK:-0} -eq 1 ]]; then
 fi
 
 # helper: write file if not exists or if FORCE
+# shellcheck disable=SC2317
 write_file() {
   local path="$1"; shift
   local mode=${1:-w}
@@ -196,8 +201,30 @@ write_file() {
   fi
   mkdir -p "$(dirname "$path")"
   cat > "$path"
-  chmod 0644 "$path"
+  if [[ "$mode" == "x" ]]; then
+    chmod 0755 "$path"
+  else
+    chmod 0644 "$path"
+  fi
   echo "created: $path"
+}
+
+# helper: render a template file with simple placeholders into destination
+write_template() {
+  local tmpl="$1" dest="$2"
+  if [[ ! -f "$tmpl" ]]; then
+    echo "template missing: $tmpl" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$dest")"
+  # Replace placeholders: __NAME__, __AUTHOR__, __EDITION__, __LICENSE__
+  sed -e "s/__NAME__/${NAME//\//\\\//}/g" \
+      -e "s/__AUTHOR__/${AUTHOR//\//\\\//}/g" \
+      -e "s/__EDITION__/${EDITION//\//\\\//}/g" \
+      -e "s/__LICENSE__/${LICENSE_CHOICE//\//\\\//}/g" \
+      "$tmpl" > "$dest"
+  chmod 0644 "$dest"
+  echo "created: $dest"
 }
 
 # Ensure cargo exists when we intend to use it
@@ -248,18 +275,9 @@ else
     if [[ $DRY_RUN -eq 1 ]]; then
       info "(dry) create Cargo.toml"
     else
-      cat > Cargo.toml <<-TOML
-[package]
-name = "$NAME"
-version = "0.1.0"
-edition = "$EDITION"
-authors = ["$AUTHOR"]
-description = "${NAME} - scaffolded Rust project"
-license = "${LICENSE_CHOICE}"
-
-[dependencies]
-TOML
-      echo "created: Cargo.toml"
+      # render from template
+      TEMPLATES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates"
+      write_template "$TEMPLATES_DIR/Cargo.toml.tmpl" Cargo.toml || true
     fi
   else
     notice "skip: Cargo.toml exists"
@@ -271,12 +289,7 @@ TOML
         if [[ $DRY_RUN -eq 1 ]]; then
           info "(dry) write src/main.rs"
         else
-          cat > src/main.rs <<'MAIN'
-  fn main() {
-      println!("Hello, world!");
-  }
-  MAIN
-          echo "created: src/main.rs"
+          write_template "$TEMPLATES_DIR/main.rs.tmpl" src/main.rs || true
         fi
       fi
   else
@@ -284,11 +297,7 @@ TOML
         if [[ $DRY_RUN -eq 1 ]]; then
           info "(dry) write src/lib.rs"
         else
-          cat > src/lib.rs <<'LIB'
-  /// Library entrypoint
-  pub fn hello() -> &'static str { "hello" }
-  LIB
-          echo "created: src/lib.rs"
+          write_template "$TEMPLATES_DIR/lib.rs.tmpl" src/lib.rs || true
         fi
       fi
   fi
@@ -300,10 +309,7 @@ if [[ "$TYPE" == "both" ]]; then
     info "(dry) ensure src/lib.rs exists"
   else
     if [[ ! -f src/lib.rs ]]; then
-      cat > src/lib.rs <<'LIB'
-/// Library entrypoint
-pub fn hello() -> &'static str { "hello" }
-LIB
+      write_template "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/lib.rs.tmpl" src/lib.rs || true
       echo "created: src/lib.rs"
     fi
   fi
@@ -314,19 +320,7 @@ if [[ ! -f README.md || $FORCE -eq 1 ]]; then
   if [[ $DRY_RUN -eq 1 ]]; then
     info "(dry) create README.md"
   else
-    cat > README.md <<-README
-# $NAME
-
-Scaffolded Rust project created with scripts/scaffold_rust.sh.
-
-Build and run:
-
-```sh
-cargo build
-cargo run -- --help
-```
-
-README
+    write_template "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/README.md.tmpl" README.md || true
     echo "created: README.md"
   fi
 fi
@@ -336,16 +330,7 @@ if [[ ! -f .gitignore || $FORCE -eq 1 ]]; then
   if [[ $DRY_RUN -eq 1 ]]; then
     info "(dry) create .gitignore"
   else
-    cat > .gitignore <<'GITIGNORE'
-# Generated .gitignore for Rust
-target/
-**/*.rs.bk
-**/*~
-.DS_Store
-Cargo.lock
-.idea/
-.vscode/
-GITIGNORE
+    write_template "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/gitignore.tmpl" .gitignore || true
     echo "created: .gitignore"
   fi
 fi
@@ -355,9 +340,7 @@ if [[ ! -f rustfmt.toml || $FORCE -eq 1 ]]; then
   if [[ $DRY_RUN -eq 1 ]]; then
     info "(dry) create rustfmt.toml"
   else
-    cat > rustfmt.toml <<'RUSTFMT'
-max_width = 100
-RUSTFMT
+    write_template "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/rustfmt.toml.tmpl" rustfmt.toml || true
     echo "created: rustfmt.toml"
   fi
 fi
@@ -366,34 +349,15 @@ fi
 create_license() {
   local lic="$1"
   if [[ "$lic" == "MIT" ]]; then
-    local year=$(date +%Y)
-    cat > LICENSE <<-MIT
-MIT License
-
-Copyright (c) $year ${AUTHOR}
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-MIT
+    local year
+    year=$(date +%Y)
+    # render MIT license template
+    write_template "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/LICENSE-MIT.tmpl" "$TARGET_ABS/LICENSE" || true
+    # substitute year and author in-place
+    sed -i "s/__YEAR__/$year/g; s/__AUTHOR__/${AUTHOR//\//\\\//}/g" "$TARGET_ABS/LICENSE" || true
     echo "created: LICENSE (MIT)"
   elif [[ "$lic" == "Apache-2.0" ]]; then
-    cat > LICENSE <<'APACHE'
-Apache License
-Version 2.0, January 2004
-http://www.apache.org/licenses/
-APACHE
+    write_template "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/LICENSE-APACHE.tmpl" "$TARGET_ABS/LICENSE" || true
     echo "created: LICENSE (Apache-2.0)"
   else
     echo "no license requested"
@@ -502,29 +466,8 @@ if [[ $DO_CI -eq 1 ]]; then
     if [[ $DRY_RUN -eq 1 ]]; then
       info "(dry) create .github/workflows/ci.yml"
     else
-      cat > .github/workflows/ci.yml <<'CI'
-name: CI
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build
-        run: |
-          cargo fmt -- --check || true
-          cargo build --verbose
-          cargo test --verbose
-CI
+      mkdir -p .github/workflows
+      write_template "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/ci.yml.tmpl" .github/workflows/ci.yml || true
       echo "created: .github/workflows/ci.yml"
     fi
   fi

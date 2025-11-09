@@ -1,5 +1,8 @@
 # Scaffold scripts — README
 
+[![CI](https://github.com/xuoxod/sarp/actions/workflows/ci.yml/badge.svg)](https://github.com/xuoxod/sarp/actions/workflows/ci.yml)
+[![Install lifecycle](https://github.com/xuoxod/sarp/actions/workflows/install-lifecycle.yml/badge.svg)](https://github.com/xuoxod/sarp/actions/workflows/install-lifecycle.yml)
+
 This folder contains the Rust project scaffolding helpers and tests.
 
 Short note about running a real scaffold (your "B" plan)
@@ -106,6 +109,36 @@ mkdir -p /tmp/sarp-real && cd /tmp/sarp-real
 bash /path/to/sarp/scaffold_rust.sh -n mytool -d . --ci --git
 ```
 
+## 3.1) Install / one-liner (optional, review first)
+
+If you want a painless local install so `sarp-scaffold` is available on your PATH, two safe approaches are supported. Always inspect scripts before running any remote one-liner.
+
+1) From a checked-out repo (recommended):
+
+```bash
+# from repo root
+bash scripts/sarp/install.sh --dry-run      # preview actions (recommended)
+bash scripts/sarp/install.sh                 # perform install (asks for PATH change if needed)
+```
+
+2) From a distribution tarball (recommended for releases):
+
+```bash
+tar xzf dist/sarp-scaffold-<timestamp>.tar.gz -C /tmp
+bash /tmp/sarp-scaffold-<timestamp>/scripts/sarp/install.sh --dry-run
+bash /tmp/sarp-scaffold-<timestamp>/scripts/sarp/install.sh
+```
+
+3) One-line (not recommended without review):
+
+```bash
+# Only use if you trust the source and have reviewed the script.
+curl -fsSL https://github.com/USER/sarp/raw/main/scripts/sarp/install.sh | bash -s -- --dry-run
+# after review, run without --dry-run or run from a local copy
+```
+
+Security note: never run a shell script piped directly from the network without inspecting it. The recommended pattern is to `curl -fsSL ... -o install.sh` then open `install.sh` in your editor and run `bash install.sh --dry-run`.
+
 Tip: use `--create` to allow creating the target directory if it doesn't exist.
 
 ---
@@ -176,6 +209,33 @@ Full tree (the one you probably saw locally):
 CI (Continuous Integration) runs the smoke test and linters automatically on GitHub when you push. It helps catch environment differences and regressions early.
 
 If you'd like I can add a minimal workflow file on a branch (no merge) so you can review before enabling it.
+
+### Running tests locally (recommended)
+
+A small test runner is provided to run the unit and lifecycle tests locally. It mirrors what CI will execute and is useful before opening a PR.
+
+Run the quick unit-only runner:
+
+```bash
+# run only fast unit tests
+bash scripts/sarp/scripts/tests/run_all.sh --skip-slow
+```
+
+Run the full suite (includes install/uninstall lifecycle tests):
+
+```bash
+# may modify a throwaway HOME; tests use a temporary HOME and clean up after themselves
+bash scripts/sarp/scripts/tests/run_all.sh
+```
+
+CI integration note
+
+- The repository contains a GitHub Actions workflow that runs a fast `unit-tests` job first and, if those pass, runs a longer `lifecycle-tests` job that performs the install/uninstall lifecycle. This design minimizes cost and gives fast feedback for most changes.
+- Wiring the local `run_all.sh` into CI (i.e., a CI step that simply calls the runner) is reasonable and reduces duplication between local and CI commands. The trade-offs:
+  - Pros: single source of truth for test invocation; easier to maintain; local dev parity.
+  - Cons: the runner may include helpers or environment assumptions that differ from the CI runner; ensure the script is idempotent and uses temporary HOME (it already does) before wiring it into CI.
+
+Overall recommendation: wire the runner into CI (as a job step) for parity, but keep the existing split job structure (fast unit job + lifecycle job) to fail fast on quick checks.
 
 ---
 

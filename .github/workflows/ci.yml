@@ -1,0 +1,56 @@
+name: SARP CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    name: Lint & Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install markdownlint CLI
+        run: |
+          npm install -g markdownlint-cli@0.34.0
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+
+      - name: ShellCheck (lint shell scripts)
+        run: |
+          echo "Running shellcheck on scripts/"
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck scripts/**/*.sh || true
+          else
+            echo "shellcheck not available, skipping";
+          fi
+
+      - name: Bash syntax check
+        run: |
+          echo "Checking bash syntax (bash -n)"
+          find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 -I{} bash -n {}
+
+      - name: Markdown lint (README)
+        run: |
+          if command -v markdownlint >/dev/null 2>&1; then
+            markdownlint README.md || true
+          else
+            echo "markdownlint not available, skipping";
+          fi
+
+      - name: Run smoke test
+        run: |
+          echo "Running scaffold smoke test"
+          bash scripts/tests/scaffold_smoke_test.sh

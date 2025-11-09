@@ -53,4 +53,4 @@ jobs:
       - name: Run smoke test
         run: |
           echo "Running scaffold smoke test"
-          bash scripts/tests/scaffold_smoke_test.sh
+          bash tests/scaffold_smoke_test.sh

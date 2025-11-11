@@ -11,6 +11,20 @@ Why use it
 - Creates a timestamped backup branch so you never lose the pre-reconcile state.
 - Fetches `origin` and merges (or rebases) `origin/<branch>` into your local branch.
 - Prompts before pushing the backup and before pushing the final branch (use `-y` to skip prompts).
+
+# scripts/sarp
+
+Repository helpers and small utilities for the SARP project.
+
+## git-safe-push.sh
+
+`git-safe-push.sh` is a small, conservative helper script that automates the common, safe workflow for reconciling a local branch with `origin` and pushing the reconciled result.
+
+Why use it
+
+- Creates a timestamped backup branch so you never lose the pre-reconcile state.
+- Fetches `origin` and merges (or rebases) `origin/<branch>` into your local branch.
+- Prompts before pushing the backup and before pushing the final branch (use `-y` to skip prompts).
 - Supports `--dry-run` so you can preview the steps before running them.
 
 Location
@@ -64,6 +78,8 @@ Want more?
 
 - I can add a `Makefile` target, move the script into a `bin/` directory, or add a short unit-test that validates the dry-run output. Tell me which you'd prefer.
 
+---
+
 # Scaffold scripts — README
 
 [![CI](https://github.com/xuoxod/sarp/actions/workflows/ci.yml/badge.svg)](https://github.com/xuoxod/sarp/actions/workflows/ci.yml)
@@ -90,8 +106,6 @@ bash tests/scaffold_smoke_test.sh
 Welcome to SARP: a small, safe, and opinionated set of scripts that turn an empty directory into a nicely scaffolded Rust project. This repository contains the main `scaffold_rust.sh` orchestrator, helper libraries, and a smoke test so anyone (novice → power user) can try it safely.
 
 Emoji key: 🚨 safety tip, ▶️ command/example, 🧪 test, ⚙️ configuration
-
----
 
 ## Quick facts
 
@@ -344,22 +358,7 @@ If anything behaves unexpectedly, open an issue or paste the script output here 
 
 Thanks for trying SARP — enjoy building small, tidy Rust projects. If you want, I can also add a friendly GitHub Actions workflow file on a branch so the repo runs the smoke test automatically when you push. Say the word and I'll create the branch and commit (no merge) so you can review it first.
 
-# scripts/sarp
-
-Repository helpers and small utilities for the SARP project.
-
-## git-safe-push.sh
-
-`git-safe-push.sh` is a small, conservative helper script that automates the common, safe workflow for reconciling a local branch with `origin` and pushing the reconciled result.
-
-Why use it
-
-- Creates a timestamped backup branch so you never lose the pre-reconcile state.
-- Fetches `origin` and merges (or rebases) `origin/<branch>` into your local branch.
-- Prompts before pushing the backup and before pushing the final branch (use `-y` to skip prompts).
-- Supports `--dry-run` so you can preview the steps before running them.
-
-Location
+````
 
 - `scripts/sarp/git-safe-push.sh`
 

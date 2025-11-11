@@ -16,8 +16,8 @@ Why use it
 
 # SARP — scaffold and tests (scripts/sarp)
 
-[![scaffold tests](https://github.com/xuoxod/netscan/actions/workflows/scaffold-tests.yml/badge.svg)](https://github.com/xuoxod/netscan/actions/workflows/scaffold-tests.yml)
-[![unit tests](https://github.com/xuoxod/netscan/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/xuoxod/netscan/actions/workflows/unit-tests.yml)
+[![scaffold tests](https://github.com/xuoxod/sarp/actions/workflows/scaffold-tests.yml/badge.svg)](https://github.com/xuoxod/sarp/actions/workflows/scaffold-tests.yml)
+[![install lifecycle](https://github.com/xuoxod/sarp/actions/workflows/install-lifecycle.yml/badge.svg)](https://github.com/xuoxod/sarp/actions/workflows/install-lifecycle.yml)
 
 A small collection of shell helpers and tests used to scaffold minimal Rust projects and safely test them in CI.
 

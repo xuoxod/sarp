@@ -8,3 +8,19 @@ Build and run:
 cargo build
 cargo run -- --help
 ```
+
+Notes for test authors
+
+- The scaffold can record a manifest of created files when invoked with `--record-manifest /path/to/manifest`.
+  Each manifest line is written as a tab-separated pair: `<absolute-path>\t<sha256>` (sha256 may be empty on some
+  platforms). Test harnesses can pass that manifest to a cleanup helper to remove only the files the scaffold created.
+# __NAME__
+
+Scaffolded Rust project created with scripts/scaffold_rust.sh.
+
+Build and run:
+
+```sh
+cargo build
+cargo run -- --help
+```

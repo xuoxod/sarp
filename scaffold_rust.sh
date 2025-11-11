@@ -31,6 +31,20 @@ Example:
 USAGE
 }
 
+# NOTE: This script is distributed with a small `lib/` bundle (scaffold_utils.sh,
+# scaffold_requirements.sh and scaffold_notify.sh) and a `templates/` directory.
+# When run from the original repository location the script sources those helpers
+# and uses the full feature set (colorized logs, stricter validation, template
+# rendering). To make the single-file script usable when copied into an empty
+# project directory we provide minimal fallback implementations for a few
+# helpers (path resolution, validate_target, logging shims). The fallbacks are
+# intentionally conservative — they are enough for common workflows and dry-run
+# usage but do not replace the full `lib/` behavior (symlink checking, advanced
+# prompts and platform-specific heuristics). If you need the complete behavior,
+# run the script from the repository root (or copy the `lib/` and `templates/`
+# directories alongside the script).
+
+
 ### defaults
 TYPE=bin
 EDITION=2021
@@ -63,6 +77,7 @@ while [[ $# -gt 0 ]]; do
     -a) AUTHOR="$2"; shift 2 ;;
     -l) LICENSE_CHOICE="$2"; shift 2 ;;
     -d|--dir) TARGET_DIR="$2"; shift 2 ;;
+    --record-manifest) RECORD_MANIFEST="$2"; shift 2 ;;
     --no-cargo-init) DO_CARGO_INIT=0; shift ;;
     --ci) DO_CI=1; shift ;;
     --git) DO_GIT=1; shift ;;
@@ -106,6 +121,138 @@ if [[ -f "$SC_NOTIFY" ]]; then
   source "$SC_NOTIFY"
 fi
 
+# Fallback helpers: make the script minimally portable if someone copies only
+# this single file into a new (empty) project directory. We only define
+# fallbacks for a small set of functions that the script uses unconditionally
+# (so a full lib/ bundle is not strictly required for basic usage).
+# These are only defined when the real helpers are not present.
+type -t _abs_path >/dev/null 2>&1 || {
+  _abs_path() {
+    local p=${1:-.}
+    # resolve to an absolute path; fall back to plain echo on failure
+    if [[ -d "$p" ]]; then
+      (cd "$p" 2>/dev/null && pwd) || { printf '%s' "$p"; return 0; }
+    else
+      # if it's a file or doesn't exist, return the parent dir + basename
+      local dir; dir=$(dirname -- "$p")
+      if (cd "$dir" 2>/dev/null); then
+        printf '%s/%s' "$(pwd)" "$(basename -- "$p")"
+      else
+        printf '%s' "$p"
+      fi
+    fi
+  }
+}
+
+type -t validate_target >/dev/null 2>&1 || {
+  validate_target() {
+    # validate_target <target> <create_dir_flag> <force_flag> <dry_run_flag>
+    # Returns on stdout the absolute path when successful and uses exit
+    # codes similar to the full lib implementation for compatibility:
+    # 0 success
+    # 2 refused (system dir or symlink to system path)
+    # 3 not writable
+    # 4 not empty and no --force
+    # 5 not exists and --create not given
+    # 6 cannot create (parent not writable)
+    local target=${1:-.}
+    local create=${2:-0}
+    local force=${3:-0}
+    local dry_run=${4:-0}
+
+    if [[ -z "$target" ]]; then
+      printf ''
+      return 1
+    fi
+
+    # resolve symlinks if possible to check for system paths
+    local abs
+    abs=$(_abs_path "$target") || abs="$target"
+
+    # refuse obvious system dirs
+    case "$abs" in
+      /|/bin|/sbin|/usr|/usr/bin|/usr/sbin|/etc|/proc|/sys|/dev|/boot|/root)
+        printf '' >&2
+        printf 'Refusing to scaffold into system directory: %s\n' "$abs" >&2
+        return 2
+        ;;
+    esac
+
+    # If path exists and is symlink resolve target
+    if [[ -L "$abs" ]]; then
+      local real
+      real=$(_abs_path "$(readlink -f -- "$abs")") || real="$abs"
+      case "$real" in
+        /bin/*|/sbin/*|/usr/*|/etc/*|/root/*|/dev/*)
+          printf 'Refusing to scaffold into symlink pointing to system path: %s -> %s\n' "$abs" "$real" >&2
+          return 2
+          ;;
+      esac
+    fi
+
+    if [[ -e "$abs" ]]; then
+      if [[ -d "$abs" ]]; then
+        # check writability
+        if [[ ! -w "$abs" ]]; then
+          printf 'Directory exists but is not writable: %s\n' "$abs" >&2
+          return 3
+        fi
+        # empty or only allowed files
+        shopt -s dotglob nullglob
+        local items=("$abs"/*)
+        shopt -u dotglob nullglob
+        if [[ ${#items[@]} -gt 0 ]]; then
+          # allowed harmless files
+          local allowed=(README.md .gitignore Cargo.toml)
+          local extra=0
+          for f in "${items[@]}"; do
+            local b; b=$(basename -- "$f")
+            local ok=0
+            for a in "${allowed[@]}"; do [[ "$b" == "$a" ]] && ok=1 && break; done
+            [[ $ok -eq 0 ]] && extra=1 && break
+          done
+          if [[ $extra -eq 1 && $force -ne 1 ]]; then
+            printf 'Directory %s is not empty. Use --force to proceed.\n' "$abs" >&2
+            return 4
+          fi
+        fi
+      else
+        printf 'Path exists and is not a directory: %s\n' "$abs" >&2
+        return 2
+      fi
+    else
+      # does not exist
+      if [[ $create -ne 1 ]]; then
+        printf 'Directory does not exist: %s (use --create to create)\n' "$abs" >&2
+        return 5
+      fi
+      # check parent writability
+      local parent; parent=$(dirname -- "$abs")
+      if [[ ! -w "$parent" ]]; then
+        printf 'Cannot create directory (parent not writable): %s\n' "$abs" >&2
+        return 6
+      fi
+      # attempt to create unless dry-run
+      if [[ $dry_run -ne 1 ]]; then
+        mkdir -p -- "$abs" || { printf 'cannot create target: %s\n' "$abs" >&2; return 6; }
+      fi
+    fi
+
+    printf '%s' "$abs"
+    return 0
+  }
+}
+
+# Minimal logging and helper shims used by the script so it remains usable
+type -t header >/dev/null 2>&1 || header() { printf '%s\n' "$*" >&2; }
+type -t info >/dev/null 2>&1 || info() { printf '%s\n' "$*" >&2; }
+type -t notice >/dev/null 2>&1 || notice() { printf '%s\n' "$*" >&2; }
+type -t warn >/dev/null 2>&1 || warn() { printf 'WARN: %s\n' "$*" >&2; }
+type -t error >/dev/null 2>&1 || error() { printf 'ERROR: %s\n' "$*" >&2; }
+type -t success >/dev/null 2>&1 || success() { printf '%s\n' "$*" >&2; }
+type -t check_command >/dev/null 2>&1 || check_command() { command -v "$1" >/dev/null 2>&1; }
+type -t suggest_install >/dev/null 2>&1 || suggest_install() { printf 'install %s via your distro package manager' "$1"; }
+
 # propagate opts to utils
 if [[ $NO_COLOR -eq 1 ]]; then SCAFFOLD_NO_COLOR=1; fi
 if [[ $NO_HEADER -eq 1 ]]; then SCAFFOLD_NO_HEADER=1; fi
@@ -145,11 +292,15 @@ fi
 # validate target
 TARGET_ABS=""
 if [[ -n "${TARGET_DIR:-}" ]]; then
-  # validate_target prints messages and returns abs path on stdout
-  if ! TARGET_ABS=$(validate_target "$TARGET_DIR" "$CREATE_DIR" "$FORCE" "$DRY_RUN"); then
+  # validate_target may print warnings; capture full output then extract the
+  # final non-empty line which should be the absolute path. Any diagnostic
+  # lines printed earlier are ignored for the assignment.
+  if ! out=$(validate_target "$TARGET_DIR" "$CREATE_DIR" "$FORCE" "$DRY_RUN"); then
     error "Target validation failed for: $TARGET_DIR"
     exit 3
   fi
+  TARGET_ABS=$(printf '%s
+' "$out" | awk 'NF{last=$0} END{print last}')
 else
   TARGET_ABS=$(_abs_path .)
 fi
@@ -206,6 +357,24 @@ write_file() {
   else
     chmod 0644 "$path"
   fi
+  # record into manifest if set and not a dry run
+  if [[ -n "${RECORD_MANIFEST:-}" && ${DRY_RUN:-0} -eq 0 ]]; then
+    _compute_sha256() {
+      local f="$1" s=""
+      if command -v sha256sum >/dev/null 2>&1; then
+        s=$(sha256sum -- "$f" 2>/dev/null | awk '{print $1}') || s=""
+      elif command -v shasum >/dev/null 2>&1; then
+        s=$(shasum -a 256 -- "$f" 2>/dev/null | awk '{print $1}') || s=""
+      elif command -v openssl >/dev/null 2>&1; then
+        s=$(openssl dgst -sha256 -- "$f" 2>/dev/null | awk '{print $NF}') || s=""
+      fi
+      printf '%s' "$s"
+    }
+    abs=$(readlink -f -- "$path" 2>/dev/null || true)
+    checksum=$(_compute_sha256 "$path" || true)
+    # write as tab-separated: <abs-path>\t<sha256> (sha256 may be empty)
+    printf '%s\t%s\n' "${abs:-$path}" "${checksum}" >> "$RECORD_MANIFEST" 2>/dev/null || true
+  fi
   echo "created: $path"
 }
 
@@ -224,6 +393,18 @@ write_template() {
       -e "s/__LICENSE__/${LICENSE_CHOICE//\//\\\//}/g" \
       "$tmpl" > "$dest"
   chmod 0644 "$dest"
+  if [[ -n "${RECORD_MANIFEST:-}" && ${DRY_RUN:-0} -eq 0 ]]; then
+    abs=$(readlink -f -- "$dest" 2>/dev/null || true)
+    checksum=""
+    if command -v sha256sum >/dev/null 2>&1; then
+      checksum=$(sha256sum -- "$dest" 2>/dev/null | awk '{print $1}') || checksum=""
+    elif command -v shasum >/dev/null 2>&1; then
+      checksum=$(shasum -a 256 -- "$dest" 2>/dev/null | awk '{print $1}') || checksum=""
+    elif command -v openssl >/dev/null 2>&1; then
+      checksum=$(openssl dgst -sha256 -- "$dest" 2>/dev/null | awk '{print $NF}') || checksum=""
+    fi
+    printf '%s\t%s\n' "${abs:-$dest}" "${checksum}" >> "$RECORD_MANIFEST" 2>/dev/null || true
+  fi
   echo "created: $dest"
 }
 

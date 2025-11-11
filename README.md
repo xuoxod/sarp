@@ -1,3 +1,69 @@
+# scripts/sarp
+
+Repository helpers and small utilities for the SARP project.
+
+## git-safe-push.sh
+
+`git-safe-push.sh` is a small, conservative helper script that automates the common, safe workflow for reconciling a local branch with `origin` and pushing the reconciled result.
+
+Why use it
+
+- Creates a timestamped backup branch so you never lose the pre-reconcile state.
+- Fetches `origin` and merges (or rebases) `origin/<branch>` into your local branch.
+- Prompts before pushing the backup and before pushing the final branch (use `-y` to skip prompts).
+- Supports `--dry-run` so you can preview the steps before running them.
+
+Location
+
+- `scripts/sarp/git-safe-push.sh`
+
+Basic usage
+
+Dry-run (no changes):
+
+```bash
+cd scripts/sarp
+./git-safe-push.sh --branch main --dry-run
+```
+
+Run interactively and push backup + branch:
+
+```bash
+./git-safe-push.sh --branch main
+```
+
+Non-interactive (automatic yes):
+
+```bash
+./git-safe-push.sh --branch main -y
+```
+
+Use rebase instead of merge:
+
+```bash
+./git-safe-push.sh --branch main --rebase
+```
+
+Notes & safety
+
+- The script is intentionally conservative. If a merge or rebase produces conflicts the script will stop and you must resolve them manually.
+- The backup branch name defaults to `backup/auto-before-merge-<timestamp>`; you can change the prefix with `--backup-prefix`.
+
+Optional Git alias
+
+Add the following to your `~/.gitconfig` to make the helper available as `git safe-push`:
+
+```ini
+[alias]
+    safe-push = !sh scripts/sarp/git-safe-push.sh --branch $(git rev-parse --abbrev-ref HEAD)
+```
+
+This assumes you run the alias from the repository root.
+
+Want more?
+
+- I can add a `Makefile` target, move the script into a `bin/` directory, or add a short unit-test that validates the dry-run output. Tell me which you'd prefer.
+
 # Scaffold scripts — README
 
 [![CI](https://github.com/xuoxod/sarp/actions/workflows/ci.yml/badge.svg)](https://github.com/xuoxod/sarp/actions/workflows/ci.yml)
